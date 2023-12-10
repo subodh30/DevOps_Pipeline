@@ -1,0 +1,4 @@
+httpx
+matplotlib
+asyncio
+paramiko

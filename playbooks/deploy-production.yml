@@ -1,0 +1,31 @@
+---
+- name: Remove production server from NGINX configuration
+  import_playbook: comment_nginx.yml
+  vars: 
+    run_on_host: "load_balancer_server"
+    server_ip: "{{ production_server }}"
+    
+- name: Setup Docker
+  import_playbook: setup-docker.yml
+  vars:
+    run_on_host: "{{ production_server }}"
+
+- name: Deploy Application to production server
+  import_playbook: deploy-application.yml
+  vars:
+    run_on_host: "{{ production_server }}"
+    docker_user: "{{ docker_user }}"
+    docker_password: "{{ docker_password }}"
+    image_version: "{{ image_version }}"
+    
+- name: Open Port
+  import_playbook: open-port.yml
+  vars:
+    run_on_host: "{{ production_server }}"
+    port_number: "3000"
+
+- name: Add production server to NGINX configuration
+  import_playbook: uncomment_nginx.yml
+  vars: 
+    run_on_host: "load_balancer_server"
+    server_ip: "{{ production_server }}"

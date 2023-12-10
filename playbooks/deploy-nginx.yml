@@ -1,0 +1,36 @@
+---
+- name: Install and Configure Nginx Server
+  hosts: "{{ run_on_host }}"
+  become: yes
+  become_method: sudo
+  tasks:
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
+
+    - name: Start nginx service
+      service:
+        name: nginx
+        enabled: true
+        state: started
+
+    - name: Expose port 80 with iptables
+      shell: "sudo iptables -I INPUT -p tcp -m tcp --dport 80 -j ACCEPT"
+
+    - name: Copy nginx configuration file
+      copy:
+        src: ./nginx.conf
+        dest: /etc/nginx/sites-available/default
+
+    - name: Create a symbolic link to enable the site
+      file:
+        src: /etc/nginx/sites-available/default
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+
+    - name: Restart nginx service
+      service:
+        name: nginx
+        enabled: true
+        state: restarted

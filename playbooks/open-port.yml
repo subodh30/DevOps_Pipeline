@@ -1,0 +1,10 @@
+---
+- name: Open Port
+  hosts: "{{ run_on_host }}"
+  become: yes
+  become_method: sudo
+  vars:
+    port_number: "{{ port_number }}"
+  tasks:
+  - name: Exposing port with iptables
+    shell: "sudo iptables -I INPUT -p tcp -m tcp --dport {{ port_number }} -j ACCEPT"

@@ -1,0 +1,26 @@
+---
+- name: Update NGINX Configuration
+  hosts: load_balancer_server
+  become: true
+  become_method: sudo
+  vars:
+    target_ip: "{{ server_ip }}" 
+  tasks:
+    - name: Comment out the server line with specific IP
+      lineinfile:
+        path: /etc/nginx/sites-available/default
+        regexp: '^(\s*server\s+{{ target_ip }}:3000;)'
+        line: '# server {{ target_ip }}:3000;'
+      register: comment_result
+
+    - name: Create a symbolic link to enable the site
+      file:
+        src: /etc/nginx/sites-available/default
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+
+    - name: Restart nginx service
+      service:
+        name: nginx
+        enabled: true
+        state: restarted
