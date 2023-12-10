@@ -1,10 +1,6 @@
 
 # DevOps Project Overview
 
-[![Build, Test & Publish](https://github.ncsu.edu/CCDS-CSC-519/DevOps-Pipelines/actions/workflows/build-test-publish.yml/badge.svg)](https://github.ncsu.edu/CCDS-CSC-519/DevOps-Pipelines/actions/workflows/build-test-publish.yml)
-
-[![Deploy](https://github.ncsu.edu/CCDS-CSC-519/DevOps-Pipelines/actions/workflows/deploy.yml/badge.svg)](https://github.ncsu.edu/CCDS-CSC-519/DevOps-Pipelines/actions/workflows/deploy.yml)
-
 ###  "From Code Chaos to Deployment Symphony"
 
 Software products rely on two main pillars: Development and Operations. In the past, these pillars had separate roles and worked in isolation. DevOps is the key to bridging this gap by making the developer who creates the feature also responsible for deploying it to production. This approach has proven to be very effective and popular in the industry and has been adopted by many large software companies.
