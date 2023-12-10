@@ -1,0 +1,32 @@
+{
+    "variables": [
+        {
+            "name": "env_name",
+            "value": "prd"
+        },
+        {
+            "name": "host_ip_1",
+            "value": "152.7.177.223"
+        },
+        {
+            "name": "host_ip_2",
+            "value": "152.7.179.1"
+        },
+        {
+            "name": "host_group_1",
+            "value": "prod_server_1"
+        },
+        {
+            "name": "host_group_2",
+            "value": "prod_server_2"
+        },
+        {
+            "name": "image_tag",
+            "value": "latest"
+        },
+        {
+            "name": "prod_url",
+            "value": "152.7.178.243"
+        }
+    ]
+}

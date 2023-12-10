@@ -1,0 +1,58 @@
+#Name of the workflow
+name: Deploy Template
+
+#Triggers to run the workflow
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+    secrets:
+      PUBLIC_REPO_USERNAME:
+        required: true
+      PUBLIC_REPO_PASSWORD:
+        required: true
+
+jobs:
+  #Release Job
+  setup-deploy:
+    name: Setup ${{ inputs.environment }} Infra and Deploy App # Name of the job
+    runs-on: [ self-hosted ] # The type of runner that the job will run on
+    env:
+      DOCKER_USER: ${{ secrets.PUBLIC_REPO_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.PUBLIC_REPO_PASSWORD }}
+    environment: # Environment to which the application will be deployed.
+      name: ${{ inputs.environment }}
+      url: 'http://${{ env.host_ip }}:3000'
+    steps:
+      - name: Checkout Repository #Checkout the Repository into the agent
+        uses: actions/checkout@v3
+        with:
+          ref: ''
+
+      - name: Install jq
+        run: sudo apt-get install jq -y
+
+      - name: Set Environment Variables - ${{ inputs.environment }} # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "${{ inputs.environment }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'  
+          
+      - name: Install Ansible
+        run: pip install ansible
+  
+      - name: Setup Docker
+        run: ansible-playbook -i ./playbooks/hosts.yml -l ${{ env.host_group }} -e "run_on_host=${{ env.host_group }}" ./playbooks/setup-docker.yml
+
+      - name: Deploy coffee project using Ansible
+        run: ansible-playbook -i ./playbooks/hosts.yml -l ${{ env.host_group }} -e "run_on_host=${{ env.host_group }} docker_user=$DOCKER_USER docker_password=$DOCKER_PASSWORD image_version=${{ env.image_tag }}" ./playbooks/deploy-application.yml
+        
+      - name: Open Port 3000 using Ansible
+        run: ansible-playbook -i ./playbooks/hosts.yml -l ${{ env.host_group }} -e "run_on_host=${{ env.host_group }} port_number=3000" ./playbooks/open-port.yml
+      

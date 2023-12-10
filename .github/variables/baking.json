@@ -1,0 +1,28 @@
+{
+    "variables": [
+        {
+            "name": "env_name",
+            "value": "baking"
+        },
+        {
+            "name": "host_ip",
+            "value": "152.7.179.29"
+        },
+        {
+            "name": "host_group",
+            "value": "baking_server"
+        },
+        {
+            "name": "prod_server_ip_1",
+            "value": "152.7.177.223"
+        },
+        {
+            "name": "prod_server_ip_2",
+            "value": "152.7.179.1"
+        },
+        {
+            "name": "image_tag",
+            "value": "latest"
+        }
+    ]
+}

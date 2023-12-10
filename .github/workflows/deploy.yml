@@ -1,0 +1,246 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build, Test & Publish"]
+    branches: [master]
+    types:
+      - completed
+  
+jobs:
+  deploy-dev:
+    uses: CCDS-CSC-519/DevOps-Pipelines/.github/workflows/deploy-template.yml@master #Call the template file
+    with:
+      environment: "dev"
+    secrets:
+      PUBLIC_REPO_USERNAME: ${{ secrets.PUBLIC_REPO_USERNAME }}
+      PUBLIC_REPO_PASSWORD: ${{ secrets.PUBLIC_REPO_PASSWORD }}
+
+  deploy-qa:
+    needs: [deploy-dev]
+    uses: CCDS-CSC-519/DevOps-Pipelines/.github/workflows/deploy-template.yml@master #Call the template file
+    with:
+      environment: "qa"
+    secrets:
+      PUBLIC_REPO_USERNAME: ${{ secrets.PUBLIC_REPO_USERNAME }}
+      PUBLIC_REPO_PASSWORD: ${{ secrets.PUBLIC_REPO_PASSWORD }}
+
+  integration-tests:
+    needs: [deploy-qa]
+    runs-on: [ self-hosted ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Environment Variables - qa # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "qa"
+
+      - name: Use Node.js v18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: ./coffee-project/package-lock.json
+
+      - name: Installing Dependency
+        run: npm install
+        working-directory: ./coffee-project
+
+      - name: Run Integration Tests
+        working-directory: ./coffee-project
+        run: npx jest --forceExit test/integration-tests/*.test.js
+
+  ui-tests:
+    needs: [deploy-qa]
+    runs-on: [ self-hosted ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Environment Variables - qa # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "qa"
+
+      - name: Use Node.js v18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: ./coffee-project/package-lock.json
+
+      - name: Installing Dependency
+        run: npm install
+        working-directory: ./coffee-project
+
+      - name: Run UI Tests
+        run: |
+          node test/ui-tests/*.test.js
+        working-directory: ./coffee-project
+
+  security-tests:
+    needs: [deploy-qa]
+    runs-on: [ security ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Environment Variables - qa # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "qa"
+
+      - name: OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.8.0
+        with:
+          # Target URL
+          target: "http://${{ env.host_ip }}:3000"
+          # The action status will be set to fail if ZAP identifies any alerts during the full scan
+          fail_action: false
+          allow_issue_writing: false
+
+  deploy-uat:
+    needs: [integration-tests, ui-tests, security-tests]
+    uses: CCDS-CSC-519/DevOps-Pipelines/.github/workflows/deploy-template.yml@master #Call the template file
+    with:
+      environment: "uat"
+    secrets:
+      PUBLIC_REPO_USERNAME: ${{ secrets.PUBLIC_REPO_USERNAME }}
+      PUBLIC_REPO_PASSWORD: ${{ secrets.PUBLIC_REPO_PASSWORD }}
+
+  load-testing:
+    needs: [deploy-uat]
+    runs-on: [ self-hosted ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Environment Variables - uat # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "uat"
+
+      #Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      #Install requirements
+      - name: Install requirements
+        run: pip install -r performance-metrics/requirements.txt
+
+      - name: Run Load Tests
+        run: |
+          python performance-metrics/load-test.py ${{ env.host_ip }}:3000
+
+  deploy-baking:
+    needs: [load-testing]
+    uses: CCDS-CSC-519/DevOps-Pipelines/.github/workflows/deploy-template.yml@master #Call the template file
+    with:
+      environment: "baking"
+    secrets:
+      PUBLIC_REPO_USERNAME: ${{ secrets.PUBLIC_REPO_USERNAME }}
+      PUBLIC_REPO_PASSWORD: ${{ secrets.PUBLIC_REPO_PASSWORD }}
+
+  performance-tests:
+    needs: [deploy-baking]
+    runs-on: [ self-hosted ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set Environment Variables - baking # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "baking"
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+    
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: ./performance-metrics/
+    
+      - name: Run performance comparison - Prod Server 1
+        run: python performance-test.py ${{ env.host_ip }} ${{ env.prod_server_ip_1 }} "${{ secrets.VCL_USERNAME }}" "${{ secrets.VCL_PASSWORD }}" 15
+        working-directory: ./performance-metrics/
+      
+      - name: Upload artifacts - 1
+        uses: actions/upload-artifact@v2
+        with:
+          name: performance_comparison
+          path: ./performance-metrics/performance_comparison.png
+
+      - name: Run performance comparison - Prod Server 2
+        run: python performance-test.py ${{ env.host_ip }} ${{ env.prod_server_ip_2 }} "${{ secrets.VCL_USERNAME }}" "${{ secrets.VCL_PASSWORD }}" 15
+        working-directory: ./performance-metrics/
+    
+      - name: Upload artifacts - 2
+        uses: actions/upload-artifact@v2
+        with:
+          name: performance_comparison
+          path: ./performance-metrics/performance_comparison.png
+
+  setup-load-balancer:
+    needs: [deploy-baking]
+    runs-on: [ self-hosted ]
+    environment: # Environment to which the application will be deployed.
+      name: prd
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'  
+          
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook -i ./playbooks/hosts.yml -l load_balancer_server -e "run_on_host=load_balancer_server" ./playbooks/deploy-nginx.yml
+
+  prod-deployment:
+    needs: [setup-load-balancer]
+    runs-on: [ self-hosted ]
+    env:
+      DOCKER_USER: ${{ secrets.PUBLIC_REPO_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.PUBLIC_REPO_PASSWORD }}
+      IMAGE_VERSION: 'latest'
+    environment: # Environment to which the application will be deployed.
+      name: prd
+      url: 'http://${{ env.prod_url }}'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        
+      - name: Set Environment Variables - prd # Set Variables based on environment
+        uses: ./.github/actions/set-variable
+        with:
+          variableFileName: "prd"
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'  
+          
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Deploy application on production server 1
+        run: ansible-playbook -i hosts.yml deploy-production.yml -e "run_on_host=prod_server_1 production_server=152.7.177.223 docker_user=$DOCKER_USER docker_password=$DOCKER_PASSWORD image_version=$IMAGE_VERSION"
+        working-directory: ./playbooks
+        
+      - name: Deploy application on production server 2
+        run: ansible-playbook -i hosts.yml deploy-production.yml -e "run_on_host=prod_server_2 production_server=152.7.179.1 docker_user=$DOCKER_USER docker_password=$DOCKER_PASSWORD image_version=$IMAGE_VERSION"
+        working-directory: ./playbooks

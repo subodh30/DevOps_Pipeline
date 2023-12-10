@@ -1,0 +1,20 @@
+{
+    "variables": [
+        {
+            "name": "env_name",
+            "value": "uat"
+        },
+        {
+            "name": "host_ip",
+            "value": "152.7.177.157"
+        },
+        {
+            "name": "host_group",
+            "value": "uat_server"
+        },
+        {
+            "name": "image_tag",
+            "value": "latest"
+        }
+    ]
+}

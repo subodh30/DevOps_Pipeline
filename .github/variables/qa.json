@@ -1,0 +1,20 @@
+{
+    "variables": [
+        {
+            "name": "env_name",
+            "value": "qa"
+        },
+        {
+            "name": "host_ip",
+            "value": "152.7.177.44"
+        },
+        {
+            "name": "host_group",
+            "value": "qa_server"
+        },
+        {
+            "name": "image_tag",
+            "value": "latest"
+        }
+    ]
+}
